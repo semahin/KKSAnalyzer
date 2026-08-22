@@ -1,0 +1,6 @@
+bin/
+obj/
+publish/
+KKSAnalyzer-win-x64.zip
+.vs/
+*.user
