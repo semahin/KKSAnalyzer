@@ -106,6 +106,17 @@
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
+                        <TabItem Header="Общие постфиксы IA / ID">
+                            <DataGrid x:Name="CommonSuffixGrid">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Постфикс" Binding="{Binding Suffix}" Width="120" />
+                                    <DataGridTextColumn Header="В IA" Binding="{Binding AnalogCount}" Width="80" />
+                                    <DataGridTextColumn Header="В ID" Binding="{Binding DiscreteCount}" Width="80" />
+                                    <DataGridTextColumn Header="Примеры IA" Binding="{Binding AnalogExamples}" Width="*" />
+                                    <DataGridTextColumn Header="Примеры ID" Binding="{Binding DiscreteExamples}" Width="*" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
                     </TabControl>
                 </Grid>
             </TabItem>

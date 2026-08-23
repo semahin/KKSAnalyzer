@@ -17,13 +17,17 @@ public static class KksAnalyzerService
             .OrderBy(x => x.Code, CodeComparer)
             .ToList();
 
+        var analogSuffixes = BuildSuffixGroups(document.Signals, KksSection.Analog);
+        var discreteSuffixes = BuildSuffixGroups(document.Signals, KksSection.Discrete);
+
         return new FileAnalysis
         {
             Document = document,
             Duplicates = duplicates,
             WithoutSuffix = document.Signals.Where(x => x.Suffix is null).ToList(),
-            AnalogSuffixes = BuildSuffixGroups(document.Signals, KksSection.Analog),
-            DiscreteSuffixes = BuildSuffixGroups(document.Signals, KksSection.Discrete)
+            AnalogSuffixes = analogSuffixes,
+            DiscreteSuffixes = discreteSuffixes,
+            CommonSuffixes = BuildSuffixIntersection(analogSuffixes, discreteSuffixes)
         };
     }
 
@@ -136,6 +140,28 @@ public static class KksAnalyzerService
             .OrderByDescending(x => x.Count)
             .ThenBy(x => x.Suffix, CodeComparer)
             .ToList();
+
+    private static IReadOnlyList<SuffixIntersection> BuildSuffixIntersection(
+        IEnumerable<SuffixGroup> analogSuffixes,
+        IEnumerable<SuffixGroup> discreteSuffixes)
+    {
+        var discreteBySuffix = discreteSuffixes.ToDictionary(x => x.Suffix, CodeComparer);
+
+        return analogSuffixes
+            .Where(analog => discreteBySuffix.ContainsKey(analog.Suffix))
+            .Select(analog =>
+            {
+                var discrete = discreteBySuffix[analog.Suffix];
+                return new SuffixIntersection(
+                    analog.Suffix,
+                    analog.Count,
+                    discrete.Count,
+                    analog.Examples,
+                    discrete.Examples);
+            })
+            .OrderBy(x => x.Suffix, CodeComparer)
+            .ToList();
+    }
 
     public static string SectionName(KksSection section) => section switch
     {

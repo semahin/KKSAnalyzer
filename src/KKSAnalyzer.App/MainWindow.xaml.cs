@@ -63,9 +63,10 @@ public partial class MainWindow : Window
             });
             AnalogSuffixGrid.ItemsSource = analysis.AnalogSuffixes;
             DiscreteSuffixGrid.ItemsSource = analysis.DiscreteSuffixes;
+            CommonSuffixGrid.ItemsSource = analysis.CommonSuffixes;
             SingleFileName.Text = path;
             SingleFileName.ToolTip = path;
-            SingleSummary.Text = $"Сигналов: {analysis.Document.Signals.Count}  •  групп дубликатов: {analysis.Duplicates.Count}  •  без постфикса: {analysis.WithoutSuffix.Count}  •  постфиксов IA: {analysis.AnalogSuffixes.Count}  •  постфиксов ID: {analysis.DiscreteSuffixes.Count}";
+            SingleSummary.Text = $"Сигналов: {analysis.Document.Signals.Count}  •  групп дубликатов: {analysis.Duplicates.Count}  •  без постфикса: {analysis.WithoutSuffix.Count}  •  постфиксов IA: {analysis.AnalogSuffixes.Count}  •  постфиксов ID: {analysis.DiscreteSuffixes.Count}  •  общих: {analysis.CommonSuffixes.Count}";
             SaveCleanButton.IsEnabled = analysis.Duplicates.Count > 0;
         AllSignalsGrid.UnselectAll();
         UpdateSignalSelectionSummary();

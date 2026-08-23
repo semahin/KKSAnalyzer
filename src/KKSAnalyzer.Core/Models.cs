@@ -24,6 +24,13 @@ public sealed record DuplicateGroup(string Code, KksSection Section, int Count, 
 
 public sealed record SuffixGroup(string Suffix, KksSection Section, int Count, string Examples);
 
+public sealed record SuffixIntersection(
+    string Suffix,
+    int AnalogCount,
+    int DiscreteCount,
+    string AnalogExamples,
+    string DiscreteExamples);
+
 public sealed record ComparisonRow(string Code, string Location, string FirstSection, string SecondSection);
 
 public sealed class FileAnalysis
@@ -33,6 +40,7 @@ public sealed class FileAnalysis
     public required IReadOnlyList<KksSignal> WithoutSuffix { get; init; }
     public required IReadOnlyList<SuffixGroup> AnalogSuffixes { get; init; }
     public required IReadOnlyList<SuffixGroup> DiscreteSuffixes { get; init; }
+    public required IReadOnlyList<SuffixIntersection> CommonSuffixes { get; init; }
 }
 
 public sealed class ComparisonResult

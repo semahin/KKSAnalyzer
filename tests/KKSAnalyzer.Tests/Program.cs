@@ -35,6 +35,15 @@ Run("Группировка постфиксов по разделам", () =>
     Equal(2, result.AnalogSuffixes[0].Count);
     Equal("X2", result.DiscreteSuffixes[0].Suffix);
 });
+Run("Пересечение постфиксов IA и ID", () =>
+{
+    var document = KksParser.Parse("#IA1000\nA_X1\nB_X1\nC_X2\n#\n#ID1000\nD_x1\nE_X3\n#");
+    var result = KksAnalyzerService.Analyze(document);
+    Equal(1, result.CommonSuffixes.Count);
+    Equal("X1", result.CommonSuffixes[0].Suffix);
+    Equal(2, result.CommonSuffixes[0].AnalogCount);
+    Equal(1, result.CommonSuffixes[0].DiscreteCount);
+});
 Run("Файл без системных строк", () =>
 {
     var document = KksParser.Parse("10BAC10CE011_XH43\n10BAC10CE012\n\n10BAC10CE013_XB01");
@@ -112,7 +121,7 @@ if (failures.Count > 0)
     Console.Error.WriteLine(string.Join(Environment.NewLine, failures));
     return 1;
 }
-Console.WriteLine("Все проверки пройдены (11/11).");
+Console.WriteLine("Все проверки пройдены (12/12).");
 return 0;
 
 void Run(string name, Action test)
