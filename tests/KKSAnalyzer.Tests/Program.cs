@@ -11,6 +11,13 @@ Run("Парсинг секций и постфиксов", () =>
     Equal(null, document.Signals[1].Suffix);
     Equal(KksSection.Discrete, document.Signals[2].Section);
 });
+Run("Номер в заголовках IA и ID не влияет на распознавание", () =>
+{
+    var document = KksParser.Parse("#IA900\nA_X1\n#\n#id1200\nB_X2\n#");
+    Equal(2, document.Signals.Count);
+    Equal(KksSection.Analog, document.Signals.Single(x => x.Code == "A_X1").Section);
+    Equal(KksSection.Discrete, document.Signals.Single(x => x.Code == "B_X2").Section);
+});
 Run("Дубликаты и удаление", () =>
 {
     var document = KksParser.Parse("#IA1000\nA_X1\nA_X1\nB_X2\n#");
@@ -33,6 +40,8 @@ Run("Группировка постфиксов по разделам", () =>
     var document = KksParser.Parse("#IA1000\nA_X1\nB_X1\n#\n#ID1000\nC_X2\n#");
     var result = KksAnalyzerService.Analyze(document);
     Equal(2, result.AnalogSuffixes[0].Count);
+    Equal(2, result.AnalogSuffixes[0].Codes.Count);
+    Equal("A_X1", result.AnalogSuffixes[0].Codes[0]);
     Equal("X2", result.DiscreteSuffixes[0].Suffix);
 });
 Run("Пересечение постфиксов IA и ID", () =>
@@ -43,6 +52,14 @@ Run("Пересечение постфиксов IA и ID", () =>
     Equal("X1", result.CommonSuffixes[0].Suffix);
     Equal(2, result.CommonSuffixes[0].AnalogCount);
     Equal(1, result.CommonSuffixes[0].DiscreteCount);
+    Equal(2, result.CommonSuffixes[0].AnalogCodes.Count);
+    Equal("D_x1", result.CommonSuffixes[0].DiscreteCodes[0]);
+});
+Run("Звёздочка в быстром поиске заменяет любую строку", () =>
+{
+    Equal(true, SearchPatternMatcher.Contains("20KKS_X1", "20*X1"));
+    Equal(true, SearchPatternMatcher.Contains("prefix-20KKS_X1-suffix", "20*X1"));
+    Equal(false, SearchPatternMatcher.Contains("20KKS_X2", "20*X1"));
 });
 Run("Файл без системных строк", () =>
 {
@@ -64,6 +81,20 @@ Run("Пакетный поиск кодов в текстовых файлах",
         Equal(1, result.Matches.Count);
         Equal(2, result.Matches[0].Count);
         Equal(0, result.Errors.Count);
+    }
+    finally { Directory.Delete(directory, true); }
+});
+Run("Поиск кода со звёздочкой в документах", () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "KKSAnalyzerTests", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    var path = Path.Combine(directory, "source.txt");
+    File.WriteAllText(path, "Сигналы 20KKS_X1 и 20ABC_X2.");
+    try
+    {
+        var result = DocumentSearchService.Search(["20*X1"], [path]);
+        Equal(1, result.Matches.Count);
+        Equal(1, result.Matches[0].Count);
     }
     finally { Directory.Delete(directory, true); }
 });
@@ -106,6 +137,20 @@ Run("Пересечение двух файлов", () =>
     Equal(1, result.Signals.Count);
     Equal("B_X2", result.Signals[0].Code);
 });
+Run("Выгрузка общих сигналов по разделам эталонного файла", () =>
+{
+    var reference = KksParser.Parse("#IA900\nA_X1\nB_X2\n#\n#ID900\nC_X3\nD_X4\n#");
+    var second = KksParser.Parse("#IA1200\nC_X3\nE_X5\n#\n#ID1200\nA_X1\nD_X4\n#");
+    var content = KksAnalyzerService.ExportCommonByReferenceSections(reference, second);
+    var result = KksParser.Parse(content);
+    Equal(3, result.Signals.Count);
+    Equal(KksSection.Analog, result.Signals.Single(x => x.Code == "A_X1").Section);
+    Equal(KksSection.Discrete, result.Signals.Single(x => x.Code == "C_X3").Section);
+    Equal(KksSection.Discrete, result.Signals.Single(x => x.Code == "D_X4").Section);
+    Equal(false, result.Signals.Any(x => x.Code == "B_X2" || x.Code == "E_X5"));
+    Equal(true, content.Contains("#IA900"));
+    Equal(true, content.Contains("#ID900"));
+});
 Run("Симметрическая разница двух файлов", () =>
 {
     var first = KksParser.Parse("A_X1\nB_X2");
@@ -115,13 +160,36 @@ Run("Симметрическая разница двух файлов", () =>
     Equal(true, result.Signals.Any(x => x.Code == "A_X1"));
     Equal(true, result.Signals.Any(x => x.Code == "C_X3"));
 });
+Run("Поиск ошибок распределения IA и ID", () =>
+{
+    var reference = KksParser.Parse("#IA1000\nA_X1\nB_X2\n#\n#ID1000\nC_X3\n#");
+    var checkedDocument = KksParser.Parse("#IA1000\nC_X3\nD_X4\n#\n#ID1000\nA_X1\n#");
+    var result = KksAnalyzerService.CompareSections(reference, checkedDocument);
+    Equal(2, result.CommonSignalCount);
+    Equal(2, result.Mismatches.Count);
+    Equal(KksSection.Analog, result.Mismatches.Single(x => x.Code == "A_X1").ExpectedSection);
+    Equal(KksSection.Discrete, result.Mismatches.Single(x => x.Code == "C_X3").ExpectedSection);
+});
+Run("Перенос подтверждённых сигналов между IA и ID", () =>
+{
+    var document = KksParser.Parse("; comment\n#IA900\nC_X3\nD_X4\n#\n#ID900\nA_X1\nE_X5\n#");
+    var correctedText = KksAnalyzerService.MoveSignalsToSections(document,
+        [("A_X1", KksSection.Analog), ("C_X3", KksSection.Discrete)]);
+    var corrected = KksParser.Parse(correctedText);
+    Equal(KksSection.Analog, corrected.Signals.Single(x => x.Code == "A_X1").Section);
+    Equal(KksSection.Discrete, corrected.Signals.Single(x => x.Code == "C_X3").Section);
+    Equal(KksSection.Analog, corrected.Signals.Single(x => x.Code == "D_X4").Section);
+    Equal(true, correctedText.Contains("; comment"));
+    Equal(true, correctedText.Contains("#IA900"));
+    Equal(true, correctedText.Contains("#ID900"));
+});
 
 if (failures.Count > 0)
 {
     Console.Error.WriteLine(string.Join(Environment.NewLine, failures));
     return 1;
 }
-Console.WriteLine("Все проверки пройдены (12/12).");
+Console.WriteLine("Все проверки пройдены (18/18).");
 return 0;
 
 void Run(string name, Action test)

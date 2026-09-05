@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Data;
 using System.IO;
 using System.Diagnostics;
 using KKSAnalyzer.Core;
@@ -15,6 +16,10 @@ public partial class MainWindow : Window
     private KksDocument? _firstDocument;
     private KksDocument? _secondDocument;
     private ComparisonResult? _comparison;
+    private KksDocument? _sectionReferenceDocument;
+    private KksDocument? _sectionCheckedDocument;
+    private string? _sectionCheckedPath;
+    private List<SectionMismatchRow> _sectionMismatchRows = [];
     private readonly List<SearchFileItem> _searchFiles = [];
 
     public MainWindow() => InitializeComponent();
@@ -68,6 +73,7 @@ public partial class MainWindow : Window
             SingleFileName.ToolTip = path;
             SingleSummary.Text = $"Сигналов: {analysis.Document.Signals.Count}  •  групп дубликатов: {analysis.Duplicates.Count}  •  без постфикса: {analysis.WithoutSuffix.Count}  •  постфиксов IA: {analysis.AnalogSuffixes.Count}  •  постфиксов ID: {analysis.DiscreteSuffixes.Count}  •  общих: {analysis.CommonSuffixes.Count}";
             SaveCleanButton.IsEnabled = analysis.Duplicates.Count > 0;
+        ApplySingleSearch();
         AllSignalsGrid.UnselectAll();
         UpdateSignalSelectionSummary();
     }
@@ -176,13 +182,19 @@ public partial class MainWindow : Window
 
     private void ComparisonFilter_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyComparisonFilter();
 
+    private void ComparisonSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyComparisonFilter();
+
     private void ApplyComparisonFilter()
     {
         if (_comparison is null || ComparisonGrid is null || ComparisonFilter.SelectedItem is not ComboBoxItem selected) return;
         var filter = selected.Content?.ToString();
-        ComparisonGrid.ItemsSource = filter == "Все сигналы"
+        var rows = filter == "Все сигналы"
             ? _comparison.Rows
             : _comparison.Rows.Where(x => x.Location == filter).ToList();
+        var query = ComparisonSearchBox.Text.Trim();
+        ComparisonGrid.ItemsSource = string.IsNullOrWhiteSpace(query)
+            ? rows
+            : rows.Where(x => MatchesSearch(x, query)).ToList();
     }
 
     private void ComparisonAction_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -196,6 +208,7 @@ public partial class MainWindow : Window
             "merge_into_second" => "Создаст конфигурацию из всех уникальных кодов; при совпадении раздел берётся из файла 2.",
             "union" => "Выгрузит полный набор уникальных кодов из обоих файлов.",
             "intersection" => "Выгрузит только коды, присутствующие одновременно в двух файлах.",
+            "common_by_reference_sections" => "Выгрузит только общие сигналы; раздел IA или ID и номер заголовка берутся из файла 1.",
             "symmetric_difference" => "Выгрузит коды, которые присутствуют только в одном из двух файлов.",
             _ => string.Empty
         };
@@ -231,6 +244,10 @@ public partial class MainWindow : Window
                 content = KksAnalyzerService.ExportIntersection(_firstDocument, _secondDocument);
                 defaultName = "common_codes.cfg";
                 break;
+            case "common_by_reference_sections":
+                content = KksAnalyzerService.ExportCommonByReferenceSections(_firstDocument, _secondDocument);
+                defaultName = "common_signals_IA_ID.cfg";
+                break;
             case "symmetric_difference":
                 content = KksAnalyzerService.ExportSymmetricDifference(_firstDocument, _secondDocument);
                 defaultName = "different_codes.cfg";
@@ -262,11 +279,34 @@ public partial class MainWindow : Window
         var code = item.GetType().GetProperty("Code")?.GetValue(item)?.ToString();
         if (string.IsNullOrWhiteSpace(code)) return;
 
+        AddCodesToDocumentSearch([code]);
+    }
+
+    private void SendSelectedSuffixSignals_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ListBox list }) return;
+        var selectedCodes = list.SelectedItems.Cast<string>().ToList();
+        if (selectedCodes.Count == 0)
+        {
+            MessageBox.Show(this, "Выберите хотя бы один сигнал в раскрытом списке.", "Нет выбранных сигналов",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        AddCodesToDocumentSearch(selectedCodes);
+    }
+
+    private void AddCodesToDocumentSearch(IEnumerable<string> selectedCodes)
+    {
         var codes = ParseCodes(CodeSearchBox.Text).ToList();
-        if (!codes.Contains(code, StringComparer.OrdinalIgnoreCase))
-            codes.Add(code);
+        foreach (var code in selectedCodes)
+        {
+            if (!codes.Contains(code, StringComparer.OrdinalIgnoreCase))
+                codes.Add(code);
+        }
+
         CodeSearchBox.Text = string.Join(Environment.NewLine, codes);
-        ModeTabs.SelectedIndex = 2;
+        ModeTabs.SelectedItem = CodeSearchTab;
         CodeSearchBox.Focus();
         CodeSearchBox.CaretIndex = CodeSearchBox.Text.Length;
     }
@@ -318,6 +358,7 @@ public partial class MainWindow : Window
             var paths = _searchFiles.Select(x => x.FullPath).ToList();
             var result = await Task.Run(() => DocumentSearchService.Search(codes, paths));
             CodeSearchResultsGrid.ItemsSource = result.Matches;
+            ApplyGridSearch(CodeSearchResultsGrid, DocumentResultSearchBox.Text);
             var foundCodes = result.Matches.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).Count();
             var missing = codes.Count - foundCodes;
             CodeSearchSummary.Text = $"Совпадений: {result.Matches.Sum(x => x.Count)}  •  найдено кодов: {foundCodes} из {codes.Count}  •  не найдено: {missing}" +
@@ -343,6 +384,145 @@ public partial class MainWindow : Window
         catch (Exception ex) { ShowError(ex); }
     }
 
+    private void OpenSectionReferenceFile_Click(object sender, RoutedEventArgs e) => LoadSectionCheckFile(true);
+
+    private void OpenSectionCheckedFile_Click(object sender, RoutedEventArgs e) => LoadSectionCheckFile(false);
+
+    private void LoadSectionCheckFile(bool reference)
+    {
+        var path = ChooseFile();
+        if (path is null) return;
+        try
+        {
+            var document = KksParser.Load(path);
+            if (reference)
+            {
+                _sectionReferenceDocument = document;
+                SectionReferenceFileName.Text = path;
+                SectionReferenceFileName.ToolTip = path;
+            }
+            else
+            {
+                _sectionCheckedDocument = document;
+                _sectionCheckedPath = path;
+                SectionCheckedFileName.Text = path;
+                SectionCheckedFileName.ToolTip = path;
+            }
+
+            UpdateSectionCheck();
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private void UpdateSectionCheck()
+    {
+        if (_sectionReferenceDocument is null || _sectionCheckedDocument is null) return;
+        var result = KksAnalyzerService.CompareSections(_sectionReferenceDocument, _sectionCheckedDocument);
+        _sectionMismatchRows = result.Mismatches.Select(x => new SectionMismatchRow(x)).ToList();
+        SectionMismatchGrid.ItemsSource = _sectionMismatchRows;
+        SectionCheckSummary.Text = result.CommonSignalCount == 0
+            ? "Общих сигналов в секциях #IA… / #ID… не найдено. Проверьте порядок файлов и наличие заголовков секций."
+            : result.Mismatches.Count == 0
+                ? $"Проверено общих сигналов: {result.CommonSignalCount}. Несостыковок IA / ID не найдено."
+                : $"Проверено общих сигналов: {result.CommonSignalCount}  •  найдено несостыковок: {result.Mismatches.Count}. Отметьте подтверждённые строки для переноса в файле 2.";
+        UpdateSectionApprovalSummary();
+    }
+
+    private void ApproveAllSectionMismatches_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var row in _sectionMismatchRows) row.IsApproved = true;
+        SectionMismatchGrid.Items.Refresh();
+        UpdateSectionApprovalSummary();
+    }
+
+    private void ClearSectionMismatchApprovals_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var row in _sectionMismatchRows) row.IsApproved = false;
+        SectionMismatchGrid.Items.Refresh();
+        UpdateSectionApprovalSummary();
+    }
+
+    private void SectionApproval_Changed(object sender, RoutedEventArgs e) => UpdateSectionApprovalSummary();
+
+    private void UpdateSectionApprovalSummary()
+    {
+        if (SectionApprovalSummary is null || SaveSectionCorrectionsButton is null) return;
+        var approvedCount = _sectionMismatchRows.Count(x => x.IsApproved);
+        SectionApprovalSummary.Text = _sectionMismatchRows.Count == 0
+            ? "Нет сигналов для переноса."
+            : $"Подтверждено для переноса: {approvedCount} из {_sectionMismatchRows.Count}.";
+        SaveSectionCorrectionsButton.IsEnabled = approvedCount > 0 && _sectionCheckedDocument is not null;
+    }
+
+    private void SaveSectionCorrections_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sectionCheckedDocument is null) return;
+        var approved = _sectionMismatchRows.Where(x => x.IsApproved).ToList();
+        if (approved.Count == 0) return;
+
+        var extension = Path.GetExtension(_sectionCheckedPath);
+        if (string.IsNullOrWhiteSpace(extension)) extension = ".cfg";
+        var baseName = Path.GetFileNameWithoutExtension(_sectionCheckedPath) ?? "config_2";
+        var dialog = new SaveFileDialog
+        {
+            Title = $"Сохранить файл 2 с исправленным распределением ({approved.Count})",
+            Filter = "CFG (*.cfg)|*.cfg|TXT (*.txt)|*.txt|Все файлы (*.*)|*.*",
+            FileName = $"{baseName}_IA_ID_fixed{extension}"
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            var content = KksAnalyzerService.MoveSignalsToSections(_sectionCheckedDocument,
+                approved.Select(x => (x.Code, x.ExpectedSection)));
+            File.WriteAllText(dialog.FileName, content, new System.Text.UTF8Encoding(false));
+            MessageBox.Show(this,
+                $"Перенесено сигналов: {approved.Count}. Исправленная конфигурация сохранена в новую копию; исходный файл 2 не изменён.",
+                "Готово", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private void SingleSignalSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplySingleSearch();
+
+    private void ApplySingleSearch()
+    {
+        if (SingleSignalSearchBox is null) return;
+        var query = SingleSignalSearchBox.Text;
+        ApplyGridSearch(AllSignalsGrid, query);
+        ApplyGridSearch(DuplicatesGrid, query);
+        ApplyGridSearch(NoSuffixGrid, query);
+        ApplyGridSearch(AnalogSuffixGrid, query);
+        ApplyGridSearch(DiscreteSuffixGrid, query);
+        ApplyGridSearch(CommonSuffixGrid, query);
+    }
+
+    private void DocumentResultSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (CodeSearchResultsGrid is not null)
+            ApplyGridSearch(CodeSearchResultsGrid, DocumentResultSearchBox.Text);
+    }
+
+    private static void ApplyGridSearch(DataGrid? grid, string query)
+    {
+        if (grid?.ItemsSource is null) return;
+        var trimmedQuery = query.Trim();
+        var view = CollectionViewSource.GetDefaultView(grid.ItemsSource);
+        view.Filter = string.IsNullOrWhiteSpace(trimmedQuery)
+            ? null
+            : item => MatchesSearch(item, trimmedQuery);
+        view.Refresh();
+    }
+
+    private static bool MatchesSearch(object item, string query) => item.GetType()
+        .GetProperties()
+        .Select(property => property.GetValue(item))
+        .Any(value => value switch
+        {
+            IEnumerable<string> values => values.Any(code => SearchPatternMatcher.Contains(code, query)),
+            _ => SearchPatternMatcher.Contains(value?.ToString(), query)
+        });
+
     private static IEnumerable<string> ParseCodes(string text) => text
         .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Where(x => x.Length > 0)
@@ -363,4 +543,14 @@ public partial class MainWindow : Window
     }
 
     private sealed record SignalRow(string Code, string MainPart, string SuffixDisplay, string SectionDisplay, int LineNumber);
+
+    private sealed class SectionMismatchRow(SectionMismatch mismatch)
+    {
+        public bool IsApproved { get; set; }
+        public string Code { get; } = mismatch.Code;
+        public KksSection ExpectedSection { get; } = mismatch.ExpectedSection;
+        public string ExpectedSectionDisplay { get; } = KksAnalyzerService.SectionName(mismatch.ExpectedSection);
+        public string ActualSectionDisplay { get; } = KksAnalyzerService.SectionName(mismatch.ActualSection);
+        public int CheckedLineNumber { get; } = mismatch.CheckedLineNumber;
+    }
 }

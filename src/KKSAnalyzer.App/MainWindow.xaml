@@ -26,6 +26,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <DockPanel Margin="0,0,0,12">
@@ -36,7 +37,16 @@
                     <Border Grid.Row="1" Background="#EDF3FF" CornerRadius="8" Padding="13" Margin="0,0,0,12">
                         <TextBlock x:Name="SingleSummary" Text="Загрузите файл для анализа." Foreground="#1E3A8A" />
                     </Border>
-                    <TabControl Grid.Row="2">
+                    <Border Grid.Row="2" Background="#F7F9FC" BorderBrush="#DFE5EF" BorderThickness="1" CornerRadius="8"
+                            Padding="10,7" Margin="0,0,0,12">
+                        <DockPanel>
+                            <TextBlock Text="Поиск по результатам" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0" />
+                            <TextBox x:Name="SingleSignalSearchBox" TextChanged="SingleSignalSearchBox_TextChanged"
+                                     ToolTip="Ищет по коду, основной части, постфиксу, разделу и примерам"
+                                     Padding="8,6" />
+                        </DockPanel>
+                    </Border>
+                    <TabControl Grid.Row="3">
                         <TabItem Header="Все сигналы">
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -88,34 +98,99 @@
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
-                        <TabItem Header="Постфиксы #IA1000">
-                            <DataGrid x:Name="AnalogSuffixGrid">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Постфикс" Binding="{Binding Suffix}" Width="150" />
-                                    <DataGridTextColumn Header="Количество" Binding="{Binding Count}" Width="110" />
-                                    <DataGridTextColumn Header="Примеры" Binding="{Binding Examples}" Width="*" />
-                                </DataGrid.Columns>
-                            </DataGrid>
+                        <TabItem Header="Постфиксы #IA">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <TextBlock Text="Выберите строку, чтобы раскрыть полный список кодов" Foreground="#69758C" Margin="6,5,0,7" />
+                                <DataGrid Grid.Row="1" x:Name="AnalogSuffixGrid" RowDetailsVisibilityMode="VisibleWhenSelected">
+                                    <DataGrid.RowDetailsTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#F7F9FC" Padding="14,10" BorderBrush="#DFE5EF" BorderThickness="0,1,0,1">
+                                                <StackPanel>
+                                                    <DockPanel Margin="0,0,0,7">
+                                                        <Button Content="Отправить выбранные в поиск по файлам" DockPanel.Dock="Right" Margin="10,0,0,0" Padding="10,5"
+                                                                Tag="{Binding ElementName=AnalogCodesList}" Click="SendSelectedSuffixSignals_Click" />
+                                                        <TextBlock Text="Все коды #IA — Ctrl/Shift для выбора нескольких" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    </DockPanel>
+                                                    <ListBox x:Name="AnalogCodesList" ItemsSource="{Binding Codes}" SelectionMode="Extended" Height="190"
+                                                             ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGrid.RowDetailsTemplate>
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Постфикс" Binding="{Binding Suffix}" Width="150" />
+                                        <DataGridTextColumn Header="Количество" Binding="{Binding Count}" Width="110" />
+                                        <DataGridTextColumn Header="Примеры" Binding="{Binding Examples}" Width="*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
                         </TabItem>
-                        <TabItem Header="Постфиксы #ID1000">
-                            <DataGrid x:Name="DiscreteSuffixGrid">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Постфикс" Binding="{Binding Suffix}" Width="150" />
-                                    <DataGridTextColumn Header="Количество" Binding="{Binding Count}" Width="110" />
-                                    <DataGridTextColumn Header="Примеры" Binding="{Binding Examples}" Width="*" />
-                                </DataGrid.Columns>
-                            </DataGrid>
+                        <TabItem Header="Постфиксы #ID">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <TextBlock Text="Выберите строку, чтобы раскрыть полный список кодов" Foreground="#69758C" Margin="6,5,0,7" />
+                                <DataGrid Grid.Row="1" x:Name="DiscreteSuffixGrid" RowDetailsVisibilityMode="VisibleWhenSelected">
+                                    <DataGrid.RowDetailsTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#F7F9FC" Padding="14,10" BorderBrush="#DFE5EF" BorderThickness="0,1,0,1">
+                                                <StackPanel>
+                                                    <DockPanel Margin="0,0,0,7">
+                                                        <Button Content="Отправить выбранные в поиск по файлам" DockPanel.Dock="Right" Margin="10,0,0,0" Padding="10,5"
+                                                                Tag="{Binding ElementName=DiscreteCodesList}" Click="SendSelectedSuffixSignals_Click" />
+                                                        <TextBlock Text="Все коды #ID — Ctrl/Shift для выбора нескольких" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    </DockPanel>
+                                                    <ListBox x:Name="DiscreteCodesList" ItemsSource="{Binding Codes}" SelectionMode="Extended" Height="190"
+                                                             ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGrid.RowDetailsTemplate>
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Постфикс" Binding="{Binding Suffix}" Width="150" />
+                                        <DataGridTextColumn Header="Количество" Binding="{Binding Count}" Width="110" />
+                                        <DataGridTextColumn Header="Примеры" Binding="{Binding Examples}" Width="*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
                         </TabItem>
                         <TabItem Header="Общие постфиксы IA / ID">
-                            <DataGrid x:Name="CommonSuffixGrid">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Постфикс" Binding="{Binding Suffix}" Width="120" />
-                                    <DataGridTextColumn Header="В IA" Binding="{Binding AnalogCount}" Width="80" />
-                                    <DataGridTextColumn Header="В ID" Binding="{Binding DiscreteCount}" Width="80" />
-                                    <DataGridTextColumn Header="Примеры IA" Binding="{Binding AnalogExamples}" Width="*" />
-                                    <DataGridTextColumn Header="Примеры ID" Binding="{Binding DiscreteExamples}" Width="*" />
-                                </DataGrid.Columns>
-                            </DataGrid>
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <TextBlock Text="Выберите строку, чтобы раскрыть полные списки IA и ID" Foreground="#69758C" Margin="6,5,0,7" />
+                                <DataGrid Grid.Row="1" x:Name="CommonSuffixGrid" RowDetailsVisibilityMode="VisibleWhenSelected">
+                                    <DataGrid.RowDetailsTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#F7F9FC" Padding="14,10" BorderBrush="#DFE5EF" BorderThickness="0,1,0,1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                                    <StackPanel Margin="0,0,15,0">
+                                                        <TextBlock Text="Все коды #IA — Ctrl/Shift для выбора" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                                        <ListBox x:Name="CommonAnalogCodesList" ItemsSource="{Binding AnalogCodes}" SelectionMode="Extended" Height="190"
+                                                                 ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                                        <Button Content="Отправить выбранные IA в поиск по файлам" HorizontalAlignment="Left" Margin="0,7,0,0" Padding="10,5"
+                                                                Tag="{Binding ElementName=CommonAnalogCodesList}" Click="SendSelectedSuffixSignals_Click" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="15,0,0,0">
+                                                        <TextBlock Text="Все коды #ID — Ctrl/Shift для выбора" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                                        <ListBox x:Name="CommonDiscreteCodesList" ItemsSource="{Binding DiscreteCodes}" SelectionMode="Extended" Height="190"
+                                                                 ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                                        <Button Content="Отправить выбранные ID в поиск по файлам" HorizontalAlignment="Left" Margin="0,7,0,0" Padding="10,5"
+                                                                Tag="{Binding ElementName=CommonDiscreteCodesList}" Click="SendSelectedSuffixSignals_Click" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGrid.RowDetailsTemplate>
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Постфикс" Binding="{Binding Suffix}" Width="120" />
+                                        <DataGridTextColumn Header="В IA" Binding="{Binding AnalogCount}" Width="80" />
+                                        <DataGridTextColumn Header="В ID" Binding="{Binding DiscreteCount}" Width="80" />
+                                        <DataGridTextColumn Header="Примеры IA" Binding="{Binding AnalogExamples}" Width="*" />
+                                        <DataGridTextColumn Header="Примеры ID" Binding="{Binding DiscreteExamples}" Width="*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
                         </TabItem>
                     </TabControl>
                 </Grid>
@@ -148,6 +223,8 @@
                                 <ComboBoxItem Content="Только в файле 1" />
                                 <ComboBoxItem Content="Только в файле 2" />
                             </ComboBox>
+                            <TextBox x:Name="ComparisonSearchBox" Width="250" DockPanel.Dock="Right" Margin="0,0,10,0"
+                                     TextChanged="ComparisonSearchBox_TextChanged" ToolTip="Поиск по KKS-коду и разделам" Padding="8,6" />
                             <TextBlock x:Name="ComparisonSummary" Text="Выберите два файла для сравнения." Foreground="#1E3A8A" VerticalAlignment="Center" />
                         </DockPanel>
                     </Border>
@@ -155,7 +232,7 @@
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="280" />
+                                <ColumnDefinition Width="330" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -170,6 +247,7 @@
                                 <ComboBoxItem Content="Дополнить файл 2 кодами файла 1" Tag="merge_into_second" />
                                 <ComboBoxItem Content="Объединение всех уникальных кодов" Tag="union" />
                                 <ComboBoxItem Content="Только общие коды" Tag="intersection" />
+                                <ComboBoxItem Content="Общие сигналы по IA / ID файла 1" Tag="common_by_reference_sections" />
                                 <ComboBoxItem Content="Только различающиеся коды" Tag="symmetric_difference" />
                             </ComboBox>
                             <TextBlock Grid.Column="2" x:Name="ComparisonActionHint" Margin="14,0" VerticalAlignment="Center" Foreground="#69758C"
@@ -189,7 +267,66 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="Работа с кодами">
+            <TabItem Header="Проверка IA / ID">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,8,12">
+                            <StackPanel>
+                                <TextBlock Text="1. Эталонный файл" FontSize="15" FontWeight="SemiBold" />
+                                <TextBlock Text="Здесь сигналы верно распределены по IA и ID" Foreground="#69758C" Margin="0,2,0,9" />
+                                <Button Content="Выбрать файл 1" Click="OpenSectionReferenceFile_Click" HorizontalAlignment="Left" Style="{StaticResource PrimaryButton}" />
+                                <TextBlock x:Name="SectionReferenceFileName" Text="Файл не выбран" Foreground="#64748B" Margin="0,7,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Margin="8,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="2. Проверяемый файл" FontSize="15" FontWeight="SemiBold" />
+                                <TextBlock Text="В нём будут найдены ошибочно размещённые сигналы" Foreground="#69758C" Margin="0,2,0,9" />
+                                <Button Content="Выбрать файл 2" Click="OpenSectionCheckedFile_Click" HorizontalAlignment="Left" Style="{StaticResource PrimaryButton}" />
+                                <TextBlock x:Name="SectionCheckedFileName" Text="Файл не выбран" Foreground="#64748B" Margin="0,7,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <Border Grid.Row="1" Background="#EDF3FF" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                        <TextBlock x:Name="SectionCheckSummary" Text="Выберите эталонный и проверяемый файлы." Foreground="#1E3A8A" TextWrapping="Wrap" />
+                    </Border>
+                    <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="10" Margin="0,0,0,10">
+                        <DockPanel>
+                            <Button x:Name="SaveSectionCorrectionsButton" Content="Перенести отмеченные и сохранить копию"
+                                    Click="SaveSectionCorrections_Click" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" IsEnabled="False" Margin="8,0,0,0" />
+                            <Button Content="Отметить все" Click="ApproveAllSectionMismatches_Click" DockPanel.Dock="Left" />
+                            <Button Content="Снять отметки" Click="ClearSectionMismatchApprovals_Click" DockPanel.Dock="Left" />
+                            <TextBlock x:Name="SectionApprovalSummary" Text="Сначала проверьте найденные расхождения вручную."
+                                       VerticalAlignment="Center" Foreground="#69758C" Margin="10,0" TextWrapping="Wrap" />
+                        </DockPanel>
+                    </Border>
+                    <DataGrid Grid.Row="3" x:Name="SectionMismatchGrid" IsReadOnly="False">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Исправить" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsApproved, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center" Checked="SectionApproval_Changed" Unchecked="SectionApproval_Changed" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="KKS-код" Binding="{Binding Code}" Width="*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="Должен быть (файл 1)" Binding="{Binding ExpectedSectionDisplay}" Width="210" IsReadOnly="True" />
+                            <DataGridTextColumn Header="Сейчас (файл 2)" Binding="{Binding ActualSectionDisplay}" Width="210" IsReadOnly="True" />
+                            <DataGridTextColumn Header="Строка в файле 2" Binding="{Binding CheckedLineNumber}" Width="135" IsReadOnly="True" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <TabItem x:Name="CodeSearchTab" Header="Работа с кодами">
                 <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -221,6 +358,9 @@
                         <DockPanel>
                             <Button x:Name="StartSearchButton" Content="Найти коды" Click="StartCodeSearch_Click" DockPanel.Dock="Right"
                                     Style="{StaticResource PrimaryButton}" Margin="12,0,0,0" />
+                            <TextBox x:Name="DocumentResultSearchBox" Width="250" DockPanel.Dock="Right"
+                                     TextChanged="DocumentResultSearchBox_TextChanged" ToolTip="Фильтр найденных сигналов, файлов и фрагментов"
+                                     Padding="8,6" />
                             <TextBlock x:Name="CodeSearchSummary" Text="Добавьте коды и документы, затем запустите поиск." Foreground="#1E3A8A" VerticalAlignment="Center" />
                         </DockPanel>
                     </Border>

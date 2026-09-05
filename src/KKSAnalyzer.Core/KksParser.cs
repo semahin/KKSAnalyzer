@@ -15,15 +15,9 @@ public static class KksParser
         for (var index = 0; index < lines.Length; index++)
         {
             var value = lines[index].Trim();
-            if (value.Equals("#IA1000", StringComparison.OrdinalIgnoreCase))
+            if (TryParseSectionHeader(value, out var parsedSection))
             {
-                section = KksSection.Analog;
-                continue;
-            }
-
-            if (value.Equals("#ID1000", StringComparison.OrdinalIgnoreCase))
-            {
-                section = KksSection.Discrete;
+                section = parsedSection;
                 continue;
             }
 
@@ -47,6 +41,25 @@ public static class KksParser
         }
 
         return new KksDocument { Lines = lines, Signals = signals };
+    }
+
+    public static bool TryParseSectionHeader(string value, out KksSection section)
+    {
+        var header = value.Trim();
+        section = KksSection.Unknown;
+        if (header.Length < 4 || header[0] != '#') return false;
+
+        var prefix = header[..3];
+        if (prefix.Equals("#IA", StringComparison.OrdinalIgnoreCase))
+            section = KksSection.Analog;
+        else if (prefix.Equals("#ID", StringComparison.OrdinalIgnoreCase))
+            section = KksSection.Discrete;
+        else
+            return false;
+
+        if (header[3..].All(char.IsDigit)) return true;
+        section = KksSection.Unknown;
+        return false;
     }
 
     public static KksDocument Load(string path)

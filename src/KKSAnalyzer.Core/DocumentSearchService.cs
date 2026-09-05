@@ -49,14 +49,14 @@ public static class DocumentSearchService
 
             foreach (var code in normalizedCodes)
             {
-                var positions = FindAll(text, code);
-                if (positions.Count == 0) continue;
+                var textMatches = FindAll(text, code);
+                if (textMatches.Count == 0) continue;
                 matches.Add(new CodeSearchResult(
                     code,
                     Path.GetFileName(path),
                     path,
-                    positions.Count,
-                    CreateSnippet(text, positions[0], code.Length)));
+                    textMatches.Count,
+                    CreateSnippet(text, textMatches[0].Index, textMatches[0].Length)));
             }
         }
 
@@ -127,15 +127,26 @@ public static class DocumentSearchService
         return new UTF8Encoding(false, false).GetString(bytes).TrimStart('\uFEFF');
     }
 
-    private static List<int> FindAll(string text, string value)
+    private static List<TextMatch> FindAll(string text, string value)
     {
-        var result = new List<int>();
+        if (value.Contains('*'))
+        {
+            if (value.All(character => character == '*')) return [];
+            var pattern = Regex.Escape(value).Replace("\\*", @"\S*?");
+            return Regex.Matches(text, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                    TimeSpan.FromSeconds(2))
+                .Where(match => match.Length > 0)
+                .Select(match => new TextMatch(match.Index, match.Length))
+                .ToList();
+        }
+
+        var result = new List<TextMatch>();
         var start = 0;
         while (start < text.Length)
         {
             var index = text.IndexOf(value, start, StringComparison.OrdinalIgnoreCase);
             if (index < 0) break;
-            result.Add(index);
+            result.Add(new TextMatch(index, value.Length));
             start = index + Math.Max(value.Length, 1);
         }
         return result;
@@ -150,4 +161,6 @@ public static class DocumentSearchService
         value = Regex.Replace(value, @"\s+", " ").Trim();
         return $"{(start > 0 ? "…" : "")}{value}{(end < text.Length ? "…" : "")}";
     }
+
+    private sealed record TextMatch(int Index, int Length);
 }

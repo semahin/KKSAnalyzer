@@ -22,16 +22,36 @@ public sealed class KksDocument
 
 public sealed record DuplicateGroup(string Code, KksSection Section, int Count, string Lines);
 
-public sealed record SuffixGroup(string Suffix, KksSection Section, int Count, string Examples);
+public sealed record SuffixGroup(
+    string Suffix,
+    KksSection Section,
+    int Count,
+    string Examples,
+    IReadOnlyList<string> Codes);
 
 public sealed record SuffixIntersection(
     string Suffix,
     int AnalogCount,
     int DiscreteCount,
     string AnalogExamples,
-    string DiscreteExamples);
+    string DiscreteExamples,
+    IReadOnlyList<string> AnalogCodes,
+    IReadOnlyList<string> DiscreteCodes);
 
 public sealed record ComparisonRow(string Code, string Location, string FirstSection, string SecondSection);
+
+public sealed record SectionMismatch(
+    string Code,
+    KksSection ExpectedSection,
+    KksSection ActualSection,
+    int ReferenceLineNumber,
+    int CheckedLineNumber);
+
+public sealed class SectionConsistencyResult
+{
+    public required IReadOnlyList<SectionMismatch> Mismatches { get; init; }
+    public required int CommonSignalCount { get; init; }
+}
 
 public sealed class FileAnalysis
 {
